@@ -1,0 +1,7 @@
+numpy<2
+torch
+transformers
+datasets
+tqdm
+gitpython
+sentencepiece
