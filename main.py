@@ -1,8 +1,14 @@
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "0"
+
+import torch
 from git import Repo
 from tqdm import tqdm
 from transformers import T5ForConditionalGeneration, T5Tokenizer, Trainer, TrainingArguments
 from datasets import Dataset, load_from_disk
-import os
+
+device = torch.device('cpu')
 
 def clear_terminal():
 	os.system('cls' if os.name == 'nt' else 'clear')
@@ -29,10 +35,10 @@ def train_model(dataset):
 
 	if os.path.isdir(model_path):
 		tokenizer = T5Tokenizer.from_pretrained(model_path)
-		model = T5ForConditionalGeneration.from_pretrained(model_path)
+		model = T5ForConditionalGeneration.from_pretrained(model_path).to(device)
 	else:
 		tokenizer = T5Tokenizer.from_pretrained('t5-small')
-		model = T5ForConditionalGeneration.from_pretrained('t5-small')
+		model = T5ForConditionalGeneration.from_pretrained('t5-small').to(device)
 
 	def preprocess(examples):
 		diffs_cleaned = []
@@ -67,7 +73,8 @@ def train_model(dataset):
 		logging_dir='./logs',
 		logging_steps=10,
 		learning_rate=5e-5,
-		weight_decay=0.01
+		weight_decay=0.01,
+		no_cuda=True
 	)
 
 	trainer = Trainer(
@@ -89,7 +96,8 @@ def train_model(dataset):
 def suggest_commit_message(repo_path):
 	model_path = os.path.abspath('./output/commit_model')
 	tokenizer = T5Tokenizer.from_pretrained(model_path)
-	model = T5ForConditionalGeneration.from_pretrained(model_path)
+	model = T5ForConditionalGeneration.from_pretrained(model_path).to(device)
+
 	repo = Repo(repo_path)
 	diff = repo.git.diff('--cached', '--no-color')
 
@@ -99,7 +107,7 @@ def suggest_commit_message(repo_path):
 	diff_clean = "\n".join(line for line in diff.splitlines() if line.startswith('+') or line.startswith('-'))
 
 	prompt = "Generate a commit message for these changes:\n" + diff_clean
-	input_ids = tokenizer(prompt, return_tensors='pt', max_length=512, truncation=True).input_ids
+	input_ids = tokenizer(prompt, return_tensors='pt', max_length=512, truncation=True).input_ids.to(device)
 	outputs = model.generate(input_ids, max_length=128, num_beams=4, early_stopping=True)
 	message = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
