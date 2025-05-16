@@ -1,7 +1,7 @@
 from git import Repo
 from tqdm import tqdm
 from transformers import T5ForConditionalGeneration, T5Tokenizer, Trainer, TrainingArguments
-from datasets import Dataset
+from datasets import Dataset, load_from_disk
 import os
 
 def clear_terminal():
@@ -25,6 +25,7 @@ def prepare_dataset(data):
 def train_model(dataset):
 	model_path = './output/commit_model'
 	checkpoint_path = os.path.join(model_path, 'checkpoint-last')
+	tokenized_path = './output/tokenized_dataset'
 
 	if os.path.isdir(model_path):
 		tokenizer = T5Tokenizer.from_pretrained(model_path)
@@ -49,7 +50,13 @@ def train_model(dataset):
 		model_inputs['labels'] = label_ids
 		return model_inputs
 
-	tokenized_datasets = dataset.map(preprocess, batched=True)
+	if os.path.isdir(tokenized_path):
+		print("[INFO] Chargement du dataset tokenisé depuis le disque.")
+		tokenized_datasets = load_from_disk(tokenized_path)
+	else:
+		print("[INFO] Pré-traitement du dataset...")
+		tokenized_datasets = dataset.map(preprocess, batched=True)
+		tokenized_datasets.save_to_disk(tokenized_path)
 
 	training_args = TrainingArguments(
 		output_dir=model_path,
@@ -70,8 +77,10 @@ def train_model(dataset):
 	)
 
 	if os.path.isdir(checkpoint_path):
+		print("[INFO] Reprise de l'entraînement depuis le checkpoint.")
 		trainer.train(resume_from_checkpoint=checkpoint_path)
 	else:
+		print("[INFO] Démarrage d'un nouvel entraînement.")
 		trainer.train()
 
 	model.save_pretrained(model_path)
