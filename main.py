@@ -1,21 +1,43 @@
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "0"
+import sys
+try:
+	import accelerate
+except ImportError:
+	print("[ERREUR] Le module 'accelerate>=0.26.0' est requis. Exécutez : pip install 'accelerate>=0.26.0'")
+	sys.exit(1)
 
-import torch
+import os
+import json
+import tempfile
+import shutil
+
 from git import Repo
 from tqdm import tqdm
 from transformers import T5ForConditionalGeneration, T5Tokenizer, Trainer, TrainingArguments
-from datasets import Dataset, load_from_disk
+from datasets import Dataset
+import torch
+
+MODEL_NAME = "t5-small"
+MODEL_OUTPUT_DIR = "./output/commit_model"
+
+# Force CPU usage
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "0"
 
 device = torch.device('cpu')
 
-def clear_terminal():
+if os.environ.get('TERM'):
 	os.system('cls' if os.name == 'nt' else 'clear')
 
 def extract_git_data(repo_path, max_commits=None):
 	repo = Repo(repo_path)
-	commits = list(repo.iter_commits('main'))
+
+	# Détermine automatiquement la branche par défaut
+	try:
+		branch_name = repo.active_branch.name
+	except TypeError:
+		branch_name = repo.git.rev_parse('--abbrev-ref', 'HEAD')
+
+	commits = list(repo.iter_commits(branch_name))
 	data = []
 	for commit in tqdm(commits[:max_commits]):
 		diff = repo.git.show(commit.hexsha, '--no-color')
@@ -28,18 +50,7 @@ def prepare_dataset(data):
 	messages = [item['message'] for item in data]
 	return Dataset.from_dict({'diff': diffs, 'message': messages})
 
-def train_model(dataset):
-	model_path = './output/commit_model'
-	checkpoint_path = os.path.join(model_path, 'checkpoint-last')
-	tokenized_path = './output/tokenized_dataset'
-
-	if os.path.isdir(model_path):
-		tokenizer = T5Tokenizer.from_pretrained(model_path)
-		model = T5ForConditionalGeneration.from_pretrained(model_path).to(device)
-	else:
-		tokenizer = T5Tokenizer.from_pretrained('t5-small')
-		model = T5ForConditionalGeneration.from_pretrained('t5-small').to(device)
-
+def preprocess_dataset(dataset, tokenizer):
 	def preprocess(examples):
 		diffs_cleaned = []
 		for diff in examples['diff']:
@@ -56,77 +67,110 @@ def train_model(dataset):
 		model_inputs['labels'] = label_ids
 		return model_inputs
 
-	if os.path.isdir(tokenized_path):
-		print("[INFO] Chargement du dataset tokenisé depuis le disque.")
-		tokenized_datasets = load_from_disk(tokenized_path)
-	else:
-		print("[INFO] Pré-traitement du dataset...")
-		tokenized_datasets = dataset.map(preprocess, batched=True)
-		tokenized_datasets.save_to_disk(tokenized_path)
+	return dataset.map(preprocess, batched=True)
 
+def train_model_on_dataset(model, tokenizer, dataset):
 	training_args = TrainingArguments(
-		output_dir=model_path,
-		num_train_epochs=5,
+		output_dir=MODEL_OUTPUT_DIR,
+		num_train_epochs=1,
 		per_device_train_batch_size=4,
 		save_strategy="epoch",
-		save_total_limit=3,
+		save_total_limit=2,
 		logging_dir='./logs',
 		logging_steps=10,
 		learning_rate=5e-5,
 		weight_decay=0.01,
-		no_cuda=True
+		use_cpu=True,
+		resume_from_checkpoint=os.path.isdir(os.path.join(MODEL_OUTPUT_DIR, 'checkpoint-1'))
 	)
 
 	trainer = Trainer(
 		model=model,
 		args=training_args,
-		train_dataset=tokenized_datasets,
+		train_dataset=dataset,
 	)
 
-	if os.path.isdir(checkpoint_path):
-		print("[INFO] Reprise de l'entraînement depuis le checkpoint.")
-		trainer.train(resume_from_checkpoint=checkpoint_path)
+	trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
+
+def clone_repo_temp(url):
+	temp_dir = tempfile.mkdtemp(prefix="repo_")
+	print(f"[INFO] Clonage du dépôt dans {temp_dir}")
+	try:
+		Repo.clone_from(url, temp_dir)
+	except Exception as e:
+		print(f"[ERREUR] Échec du clonage de {url} : {e}")
+		shutil.rmtree(temp_dir, ignore_errors=True)
+		raise
+	return temp_dir
+
+def load_urls_from_file(filepath):
+	if filepath.endswith('.json'):
+		with open(filepath, 'r', encoding='utf-8') as f:
+			urls = json.load(f)
+	elif filepath.endswith('.txt'):
+		with open(filepath, 'r', encoding='utf-8') as f:
+			urls = [line.strip() for line in f if line.strip()]
 	else:
-		print("[INFO] Démarrage d'un nouvel entraînement.")
-		trainer.train()
-
-	model.save_pretrained(model_path)
-	tokenizer.save_pretrained(model_path)
-
-def suggest_commit_message(repo_path):
-	model_path = os.path.abspath('./output/commit_model')
-	tokenizer = T5Tokenizer.from_pretrained(model_path)
-	model = T5ForConditionalGeneration.from_pretrained(model_path).to(device)
-
-	repo = Repo(repo_path)
-	diff = repo.git.diff('--cached', '--no-color')
-
-	if not diff.strip():
-		return "[No staged changes]"
-
-	diff_clean = "\n".join(line for line in diff.splitlines() if line.startswith('+') or line.startswith('-'))
-
-	prompt = "Generate a commit message for these changes:\n" + diff_clean
-	input_ids = tokenizer(prompt, return_tensors='pt', max_length=512, truncation=True).input_ids.to(device)
-	outputs = model.generate(input_ids, max_length=128, num_beams=4, early_stopping=True)
-	message = tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-	return message.strip()
+		raise ValueError("Format non supporté. Utilise un fichier .json ou .txt")
+	return urls
 
 if __name__ == "__main__":
-	trainOrGenerate = input("Do you want to generate a commit message or to train the model on a specific repository ?: \n[train/generate] : ")
+	mode = input("Mode :\n[multi-url/generate] : ").strip()
 
-	if trainOrGenerate == "train":
-		repo_path = input("Enter the path to the repository you want to train on: ")
+	if mode == "multi-url":
+		urls_file = input("Chemin vers le fichier contenant les URLs : ").strip()
+		if os.environ.get('TERM'):
+			os.system('cls' if os.name == 'nt' else 'clear')
+		urls = load_urls_from_file(urls_file)
+
+		if os.path.isdir(MODEL_OUTPUT_DIR):
+			print("[INFO] Chargement du modèle entraîné existant.")
+			tokenizer = T5Tokenizer.from_pretrained(MODEL_OUTPUT_DIR, legacy=True)
+			model = T5ForConditionalGeneration.from_pretrained(MODEL_OUTPUT_DIR).to(device)
+		else:
+			print(f"[INFO] Chargement du modèle de base {MODEL_NAME}.")
+			tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME, legacy=True)
+			model = T5ForConditionalGeneration.from_pretrained(MODEL_NAME).to(device)
+
+		for i, repo_url in enumerate(urls, start=1):
+			print(f"\n🧠 [Repo {i}/{len(urls)}] {repo_url}")
+			temp_repo_path = None
+			try:
+				temp_repo_path = clone_repo_temp(repo_url)
+				data = extract_git_data(temp_repo_path, max_commits=500)
+				dataset = prepare_dataset(data)
+				tokenized = preprocess_dataset(dataset, tokenizer)
+				train_model_on_dataset(model, tokenizer, tokenized)
+			except Exception as e:
+				print(f"[ERREUR] Problème avec {repo_url} : {e}")
+			finally:
+				if temp_repo_path:
+					shutil.rmtree(temp_repo_path, ignore_errors=True)
+
+		print("\n✅ Entraînement terminé. Sauvegarde du modèle...")
+		model.save_pretrained(MODEL_OUTPUT_DIR)
+		tokenizer.save_pretrained(MODEL_OUTPUT_DIR)
+
+	elif mode == "generate":
+		repo_path = input("Chemin du repo Git pour générer un message de commit : ").strip()
+		if os.environ.get('TERM'):
+			os.system('cls' if os.name == 'nt' else 'clear')
+
+		tokenizer = T5Tokenizer.from_pretrained(MODEL_OUTPUT_DIR, legacy=True)
+		model = T5ForConditionalGeneration.from_pretrained(MODEL_OUTPUT_DIR).to(device)
+
+		repo = Repo(repo_path)
+		diff = repo.git.diff('--cached', '--no-color')
+
+		if not diff.strip():
+			print("[AUCUN CHANGEMENT] Aucun fichier en staging.")
+		else:
+			diff_clean = "\n".join(line for line in diff.splitlines() if line.startswith('+') or line.startswith('-'))
+			prompt = "Generate a commit message for these changes:\n" + diff_clean
+			input_ids = tokenizer(prompt, return_tensors='pt', max_length=512, truncation=True).input_ids.to(device)
+			outputs = model.generate(input_ids, max_length=128, num_beams=4, early_stopping=True)
+			message = tokenizer.decode(outputs[0], skip_special_tokens=True)
+			print(f"\n💬 Suggestion de commit : {message}")
+
 	else:
-		repo_path = input("Enter the path to the repository you want to generate a commit message for: ")
-
-	clear_terminal()
-
-	if trainOrGenerate == 'train':
-		data = extract_git_data(repo_path, max_commits=500)
-		dataset = prepare_dataset(data)
-		train_model(dataset)
-	else:
-		suggestion = suggest_commit_message(repo_path)
-		print(f"\n💬 Commit suggestion : {suggestion}")
+		print("[ERREUR] Mode non reconnu.")

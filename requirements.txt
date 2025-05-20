@@ -1,7 +1,10 @@
-numpy<2
+numpy
 torch
 transformers
 datasets
 tqdm
 gitpython
 sentencepiece
+huggingface_hub[hf_xet]
+accelerate
+
