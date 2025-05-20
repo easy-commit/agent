@@ -78,8 +78,9 @@ def preprocess_dataset(dataset, tokenizer):
 
 import psutil
 
-def train_model_on_dataset(model, tokenizer, dataset):
-        ram_gb = psutil.virtual_memory().total / (1024 ** 3)
+def train_model_on_dataset(model, _, dataset):
+            ram_gb = psutil.virtual_memory().total / (1024 ** 3)
+    print(f"[INFO] RAM détectée : {ram_gb:.2f} GB")
     if ram_gb > 24:
         batch_size = 16
     elif ram_gb > 16:
@@ -107,6 +108,7 @@ def train_model_on_dataset(model, tokenizer, dataset):
         train_dataset=dataset,
     )
 
+        print(f"[INFO] Batch size utilisé : {batch_size}")
     trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
 
 def clone_repo_temp(url):
