@@ -1,3 +1,10 @@
+import os
+
+# Optimisation multithread CPU
+os.environ["OMP_NUM_THREADS"] = "3"
+os.environ["MKL_NUM_THREADS"] = "3"
+os.environ["NUMEXPR_NUM_THREADS"] = "3"
+
 import sys
 try:
     import accelerate
@@ -16,7 +23,7 @@ from transformers import T5ForConditionalGeneration, T5Tokenizer, Trainer, Train
 from datasets import Dataset
 import torch
 
-MODEL_NAME = "t5-base"
+MODEL_NAME = "t5-small"
 MODEL_OUTPUT_DIR = "./output/commit_model"
 
 # Force CPU usage
@@ -67,13 +74,23 @@ def preprocess_dataset(dataset, tokenizer):
         model_inputs['labels'] = label_ids
         return model_inputs
 
-    return dataset.map(preprocess, batched=True)
+    return dataset.map(preprocess, batched=True, load_from_cache_file=False, keep_in_memory=True)
+
+import psutil
 
 def train_model_on_dataset(model, tokenizer, dataset):
+        ram_gb = psutil.virtual_memory().total / (1024 ** 3)
+    if ram_gb > 24:
+        batch_size = 16
+    elif ram_gb > 16:
+        batch_size = 8
+    else:
+        batch_size = 4
+
     training_args = TrainingArguments(
         output_dir=MODEL_OUTPUT_DIR,
         num_train_epochs=1,
-        per_device_train_batch_size=4,
+        per_device_train_batch_size=batch_size,
         save_strategy="epoch",
         save_total_limit=2,
         logging_dir='./logs',
@@ -168,7 +185,7 @@ if __name__ == "__main__":
             diff_clean = "\n".join(line for line in diff.splitlines() if line.startswith('+') or line.startswith('-'))
             prompt = "Generate a commit message for these changes:\n" + diff_clean
             input_ids = tokenizer(prompt, return_tensors='pt', max_length=512, truncation=True).input_ids.to(device)
-            outputs = model.generate(input_ids, max_length=128, num_beams=4, early_stopping=True)
+            outputs = model.generate(input_ids, max_length=128, num_beams=4, early_stopping=True, use_cache=False)
             message = tokenizer.decode(outputs[0], skip_special_tokens=True)
             print(f"\n💬 Suggestion de commit : {message}")
 
