@@ -1,27 +1,14 @@
 import os
-
-# Optimisation multithread CPU
-os.environ["OMP_NUM_THREADS"] = "3"
-os.environ["MKL_NUM_THREADS"] = "3"
-os.environ["NUMEXPR_NUM_THREADS"] = "3"
-
 import sys
-try:
-    import accelerate
-except ImportError:
-    print("[ERREUR] Le module 'accelerate>=0.26.0' est requis. Exécutez : pip install 'accelerate>=0.26.0'")
-    sys.exit(1)
-
-import os
 import json
 import tempfile
 import shutil
-
 from git import Repo
 from tqdm import tqdm
 from transformers import T5ForConditionalGeneration, T5Tokenizer, Trainer, TrainingArguments
 from datasets import Dataset
 import torch
+import psutil
 
 MODEL_NAME = "t5-small"
 MODEL_OUTPUT_DIR = "./output/commit_model"
@@ -37,13 +24,10 @@ if os.environ.get('TERM'):
 
 def extract_git_data(repo_path, max_commits=None):
     repo = Repo(repo_path)
-
-    # Détermine automatiquement la branche par défaut
     try:
         branch_name = repo.active_branch.name
     except TypeError:
         branch_name = repo.git.rev_parse('--abbrev-ref', 'HEAD')
-    # Ignore les commits de merge pour éviter le biais
     commits = [c for c in repo.iter_commits(branch_name) if not c.message.lower().startswith('merge pull request')]
     data = []
     for commit in tqdm(commits[:max_commits]):
@@ -76,10 +60,8 @@ def preprocess_dataset(dataset, tokenizer):
 
     return dataset.map(preprocess, batched=True, load_from_cache_file=False, keep_in_memory=True)
 
-import psutil
-
 def train_model_on_dataset(model, _, dataset):
-            ram_gb = psutil.virtual_memory().total / (1024 ** 3)
+    ram_gb = psutil.virtual_memory().total / (1024 ** 3)
     print(f"[INFO] RAM détectée : {ram_gb:.2f} GB")
     if ram_gb > 24:
         batch_size = 16
@@ -108,7 +90,7 @@ def train_model_on_dataset(model, _, dataset):
         train_dataset=dataset,
     )
 
-        print(f"[INFO] Batch size utilisé : {batch_size}")
+    print(f"[INFO] Batch size utilisé : {batch_size}")
     trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
 
 def clone_repo_temp(url):
@@ -159,7 +141,7 @@ if __name__ == "__main__":
                 data = extract_git_data(temp_repo_path, max_commits=500)
                 dataset = prepare_dataset(data)
                 tokenized = preprocess_dataset(dataset, tokenizer)
-                train_model_on_dataset(model, tokenizer, tokenized)
+                train_model_on_dataset(model, None, tokenized)
             except Exception as e:
                 print(f"[ERREUR] Problème avec {repo_url} : {e}")
             finally:
