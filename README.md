@@ -1,94 +1,34 @@
-## Easy commit
+# easy-commit
 
-Create a model with Deep Learning (supervised) by training it on the repository of your choice (which you'll have locally), giving it the changes as input and the commit message as output.
+**easy-commit** is an open-source AI agent that automatically generates smart commit messages by learning from real commits found on GitHub. The goal: simplify your commit process and make your project history clear, consistent, and professional.
 
-This allows you to have a model trained with its own context, so it will respect the commit message conventions of the repository with which it has been trained.
+## Why easy-commit?
 
-### Install dependencies
+Writing good commit messages is often overlooked, but it’s crucial for understanding a project’s evolution. With easy-commit, you no longer have to worry about crafting the perfect message—let AI do it for you, inspired by the best practices from thousands of real projects.
 
-```bash
-source venv/bin/activate
-pip install -r requirements.txt
-```
+## Key Features
 
-### Train the model
+- 🧠 **Continuous learning**: The agent trains on real commit messages from GitHub, adapting to various styles and conventions.
+- 🚀 **Automatic generation**: Instantly suggests relevant commit messages based on your changes.
+- 📊 **Consistency and clarity**: Ensures your commit history is cleaner and more informative.
+- 🔄 **Open-source**: Transparent, hackable, and community-driven.
 
-```bash
-python main.py
->> Do you want to generate a commit message or to train the model on a specific repository ?:
-[train/generate] : train
->> Enter the path to the repository you want to train on:
-/path/to/your/repo
-```
-And it will start training the model on the repository you provided. It will take a while depending on the size of the repository and the number of commits it has.
+## Coming Soon
 
-### Generate a commit message
+A **CLI tool** will soon be available to use easy-commit from any terminal, on any project.  
+⚠️ The CLI will be unstable at first—feedback and bug reports are welcome!
+
+## Example Usage (upcoming CLI)
 
 ```bash
-python main.py
->> Do you want to generate a commit message or to train the model on a specific repository ?:
-[train/generate] : generate
->> Enter the path to the repository you want to generate a commit message for:
-/path/to/your/repo
+# Instantly generate a commit message from the terminal
+easy-commit generate
 ```
-And it will generate a commit message for the repository you provided based on the staged changes.
+More details and configuration options coming soon!
 
-## Results example
+## Contributing
+easy-commit is in its early days! Contributions are welcome, whether it’s on the AI, the CLI integration, documentation, or tests.
+Feel free to open an issue or a pull request.
 
-Trained on the https://my.optifit.app repository's main branch (approximately 600 commits).
-
-Look at this little boy training on the repository:
-
-![image](./screenshots/training.png)
-
-These changes were made to the repository: (just added `fictive` property to an object)
-
-```diff
-│     const phasesMatches: MatchWithLocationDetails[] = [];
-│-    const phases: { id: string; type: TournamentPhase['type'] }[] = [];
-│+    const phases: {
-│+      id: string;
-│+      type: TournamentPhase['type'];
-│+      fictive: boolean;
-│+    }[] = [];
-│
-│     tournament.phases?.forEach((phase) => {
-│       const phaseId = uuidv4();
-│@@ -63,6 +67,7 @@ export class GetRankingService {
-│       phases.push({
-│         id: phaseId,
-│         type: phase.type,
-│+        fictive: phase.fictive,
-│       });
-│     });
-│
-│diff --git a/backend/src/types/tournament.d.ts b/backend/src/types/tournament.d.ts
-│index f66422c..4c15fb4 100644
-│--- a/backend/src/types/tournament.d.ts
-│+++ b/backend/src/types/tournament.d.ts
-│@@ -227,6 +227,8 @@ export interface Ranking {
-│   }[];
-│   phases?: {
-│     type: TournamentPhase['type'];
-│+    id?: string;
-│+    fictive?: boolean;
-│   }[];
-│   matches?: MatchWithLocationDetails[];
-│ }
-│diff --git a/webapp/src/types/tournament.d.ts b/webapp/src/types/tournament.d.ts
-│index f2a5b93..4a390ad 100644
-│--- a/webapp/src/types/tournament.d.ts
-│+++ b/webapp/src/types/tournament.d.ts
-│@@ -160,6 +160,7 @@ export interface Ranking {
-│   phases?: {
-│     type: TournamentPhase['type'];
-│     id: string;
-│+    fictive?: boolean;
-│   }[];
-│ }
-│
-```
-The model generated the following commit message:
-
-![image](./screenshots/generated.png)
-
+## License
+MIT

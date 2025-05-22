@@ -5,7 +5,7 @@ import torch
 from git import Repo
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 
-MODEL_DIR = "./output/commit_model"
+MODEL_DIR = "output/easycommit_model"
 TEST_REPO = "/tmp/test-repo"
 device = torch.device("cpu")
 
