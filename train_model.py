@@ -12,7 +12,7 @@ from commit_utils import (clone_repo_temp, extract_git_data, prepare_dataset,
                           preprocess_dataset)
 from fetch_github import fetch_public_github_repos
 
-MODEL_NAME = "t5-small"
+MODEL_NAME = "t5-base"
 MODEL_OUTPUT_DIR = "./output/easycommit_model"
 URLS_FILE = "urls-github.json"
 
