@@ -1,16 +1,15 @@
+import json
 import os
 import shutil
-import json
 import time
 
 import psutil
 import torch
-from transformers import T5ForConditionalGeneration, T5Tokenizer, Trainer, TrainingArguments
+from transformers import (T5ForConditionalGeneration, T5Tokenizer, Trainer,
+                          TrainingArguments)
 
-from commit_utils import (
-    extract_git_data, prepare_dataset, preprocess_dataset,
-    clone_repo_temp
-)
+from commit_utils import (clone_repo_temp, extract_git_data, prepare_dataset,
+                          preprocess_dataset)
 from fetch_github import fetch_public_github_repos
 
 MODEL_NAME = "t5-small"
@@ -19,7 +18,8 @@ URLS_FILE = "urls-github.json"
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "0"
-device = torch.device('cpu')
+device = torch.device("cpu")
+
 
 def load_done_urls():
     if os.path.isfile(URLS_FILE):
@@ -27,12 +27,14 @@ def load_done_urls():
             return set(json.load(f))
     return set()
 
+
 def save_done_urls(done_urls):
     with open(URLS_FILE, "w") as f:
         json.dump(list(done_urls), f, indent=2)
 
+
 def train_model_on_dataset(model, dataset):
-    ram_gb = psutil.virtual_memory().total / (1024 ** 3)
+    ram_gb = psutil.virtual_memory().total / (1024**3)
     print(f"[INFO] Detected RAM: {ram_gb:.2f} GB")
     if ram_gb > 24:
         batch_size = 16
@@ -47,12 +49,14 @@ def train_model_on_dataset(model, dataset):
         per_device_train_batch_size=batch_size,
         save_strategy="epoch",
         save_total_limit=2,
-        logging_dir='./logs',
+        logging_dir="./logs",
         logging_steps=10,
         learning_rate=5e-5,
         weight_decay=0.01,
         use_cpu=True,
-        resume_from_checkpoint=os.path.isdir(os.path.join(MODEL_OUTPUT_DIR, 'checkpoint-1'))
+        resume_from_checkpoint=os.path.isdir(
+            os.path.join(MODEL_OUTPUT_DIR, "checkpoint-1")
+        ),
     )
 
     trainer = Trainer(
@@ -62,6 +66,7 @@ def train_model_on_dataset(model, dataset):
     )
     print(f"[INFO] Batch size used: {batch_size}")
     trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
+
 
 if __name__ == "__main__":
     if os.path.isdir(MODEL_OUTPUT_DIR):
@@ -84,7 +89,9 @@ if __name__ == "__main__":
         print(f"[INFO] {len(new_urls)} repos to process (not yet seen).")
 
         if not new_urls:
-            print("[INFO] No new repos to process. Pausing for 1 hour before retrying...")
+            print(
+                "[INFO] No new repos to process. Pausing for 1 hour before retrying..."
+            )
             time.sleep(3600)
             continue
 
@@ -115,4 +122,3 @@ if __name__ == "__main__":
         tokenizer.save_pretrained(MODEL_OUTPUT_DIR)
         print("[INFO] Pausing for 10 minutes before fetching new repositories...")
         time.sleep(600)
-

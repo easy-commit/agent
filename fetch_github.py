@@ -1,5 +1,6 @@
 import requests
 
+
 def fetch_public_github_repos(per_page=20, pages=2):
     url = "https://api.github.com/search/repositories"
     all_repos = []
@@ -9,7 +10,7 @@ def fetch_public_github_repos(per_page=20, pages=2):
             "sort": "stars",
             "order": "desc",
             "per_page": per_page,
-            "page": page
+            "page": page,
         }
         r = requests.get(url, params=params)
         r.raise_for_status()

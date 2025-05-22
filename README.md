@@ -13,6 +13,25 @@ Writing good commit messages is often overlooked, but it’s crucial for underst
 - 📊 **Consistency and clarity**: Ensures your commit history is cleaner and more informative.
 - 🔄 **Open-source**: Transparent, hackable, and community-driven.
 
+## For formatting
+
+### Instalation
+```bash
+pip install black flake8 isort
+```
+### Linting
+```bash
+flake8 my_script.pyy
+# or
+pylint my_script.py
+````
+### Formatting
+```bash
+black my_script.py
+# or
+isort my_script.py
+```
+
 ## Coming Soon
 
 A **CLI tool** will soon be available to use easy-commit from any terminal, on any project.  
