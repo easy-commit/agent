@@ -4,3 +4,4 @@ lib
 output
 results
 venv
+__pycache__

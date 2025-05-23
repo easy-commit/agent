@@ -1,10 +1,15 @@
 import json
 import os
+os.environ["OMP_NUM_THREADS"] = "6"
+os.environ["MKL_NUM_THREADS"] = "6"
+
 import shutil
 import time
 
 import psutil
 import torch
+torch.set_num_threads(6)
+torch.set_num_interop_threads(6)
 from transformers import (T5ForConditionalGeneration, T5Tokenizer, Trainer,
                           TrainingArguments)
 
@@ -43,21 +48,22 @@ def train_model_on_dataset(model, dataset):
     else:
         batch_size = 4
 
-    training_args = TrainingArguments(
-        output_dir=MODEL_OUTPUT_DIR,
-        num_train_epochs=1,
-        per_device_train_batch_size=batch_size,
-        save_strategy="epoch",
-        save_total_limit=2,
-        logging_dir="./logs",
-        logging_steps=10,
-        learning_rate=5e-5,
-        weight_decay=0.01,
-        use_cpu=True,
-        resume_from_checkpoint=os.path.isdir(
-            os.path.join(MODEL_OUTPUT_DIR, "checkpoint-1")
-        ),
-    )
+        training_args = TrainingArguments(
+          output_dir=MODEL_OUTPUT_DIR,
+          num_train_epochs=1,
+          per_device_train_batch_size=batch_size,
+          save_strategy="epoch",
+          save_total_limit=2,
+          logging_dir="./logs",
+          logging_steps=10,
+          learning_rate=5e-5,
+          weight_decay=0.01,
+          use_cpu=True,
+          dataloader_num_workers=6,
+          resume_from_checkpoint=os.path.isdir(
+						os.path.join(MODEL_OUTPUT_DIR, "checkpoint-1")
+          ),
+        )
 
     trainer = Trainer(
         model=model,
