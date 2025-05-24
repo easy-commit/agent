@@ -20,39 +20,45 @@ def extract_git_data(repo_path):
     from git import Repo
 
     repo = Repo(repo_path)
-    try:
-        branch = repo.active_branch.name
-    except Exception:
-        branches = [head.name for head in repo.heads]
-        if "main" in branches:
-            branch = "main"
-        elif "master" in branches:
-            branch = "master"
-        elif branches:
-            branch = branches[0]
-        else:
-            print("[ERROR] No branches found in this repo!")
-            return []
+    branches = [
+        head.name
+        for head in repo.heads
+        if not head.name.startswith(("dependabot", "gh-pages"))
+    ]
+    if not branches:
+        print("[ERROR] No branches found in this repo!")
+        return []
+
+    seen_commits = set()
     data = []
-    for i, commit in enumerate(repo.iter_commits(branch)):
-        msg = commit.message.strip()
-        if msg.startswith("Merge pull request"):
-            continue
-        diffs = commit.diff(
-            commit.parents[0] if commit.parents else None, create_patch=True
-        )
-        diff_text = ""
-        for d in diffs:
-            try:
-                diff_text += d.diff.decode("utf-8", errors="ignore")
-            except Exception:
+    for branch in branches:
+        print(f"[EXTRACT] Analyse de la branche '{branch}'")
+        for commit in repo.iter_commits(branch):
+            if commit.hexsha in seen_commits:
                 continue
-        data.append(
-            {
-                "message": msg,
-                "diff": diff_text,
-            }
-        )
+            seen_commits.add(commit.hexsha)
+            msg = commit.message.strip()
+            if (
+                msg.startswith("Merge pull request")
+                or msg.startswith("Merge branch")
+                or "pull request" in msg.lower()
+            ):
+                continue
+            diffs = commit.diff(
+                commit.parents[0] if commit.parents else None, create_patch=True
+            )
+            diff_text = ""
+            for d in diffs:
+                try:
+                    diff_text += d.diff.decode("utf-8", errors="ignore")
+                except Exception:
+                    continue
+            data.append(
+                {
+                    "message": msg,
+                    "diff": diff_text,
+                }
+            )
     return data
 
 
