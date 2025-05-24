@@ -25,12 +25,26 @@ flake8 my_script.pyy
 # or
 pylint my_script.py
 ````
+
 ### Formatting
 ```bash
 black my_script.py
 # or
 isort my_script.py
 ```
+
+## Use
+
+### In server
+```sh
+python server.py
+```
+
+### In client
+```sh
+pip install requests gitpython InquirerPy
+python easycommit_client.py
+````
 
 ## Coming Soon
 
