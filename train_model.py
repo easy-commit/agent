@@ -1,5 +1,6 @@
 import json
 import os
+
 os.environ["OMP_NUM_THREADS"] = "6"
 os.environ["MKL_NUM_THREADS"] = "6"
 
@@ -8,6 +9,7 @@ import time
 
 import psutil
 import torch
+
 torch.set_num_threads(6)
 torch.set_num_interop_threads(6)
 from transformers import (T5ForConditionalGeneration, T5Tokenizer, Trainer,
@@ -116,7 +118,6 @@ if __name__ == "__main__":
                     tokenized = preprocess_dataset(dataset, tokenizer)
                     train_model_on_dataset(model, tokenized)
 
-                    # === Sauvegarde ici après chaque repo traité ===
                     print(f"[SAVE] Saving model and tokenizer after '{repo_name}'")
                     model.save_pretrained(MODEL_OUTPUT_DIR)
                     tokenizer.save_pretrained(MODEL_OUTPUT_DIR)
@@ -129,5 +130,7 @@ if __name__ == "__main__":
                 done_urls.add(repo_url)
                 save_done_urls(done_urls)
 
-        print("\n✅ End of loop. Pausing for 10 minutes before fetching new repositories...")
+        print(
+            "\n✅ End of loop. Pausing for 10 minutes before fetching new repositories..."
+        )
         time.sleep(600)
