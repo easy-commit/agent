@@ -1,4 +1,4 @@
-# easy-commit
+<img src="white-mini-logo-with-text.svg" alt="logo" width="360"/>
 
 **easy-commit** is an open-source AI agent that automatically generates smart commit messages by learning from real commits found on GitHub. The goal: simplify your commit process and make your project history clear, consistent, and professional.
 
