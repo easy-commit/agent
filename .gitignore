@@ -2,7 +2,7 @@
 .env
 bin
 lib
-output
 results
 venv
 __pycache__
+output
