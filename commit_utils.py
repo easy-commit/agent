@@ -16,9 +16,8 @@ def clone_repo_temp(repo_url):
         raise e
 
 
-def extract_git_data(repo_path):
+def extract_git_data(repo_path, max_commits=10000):
     print(f"[EXTRACT] Analyzing repository '{repo_path}'")
-    from git import Repo
     repo = Repo(repo_path)
     branches = [
         head.name
@@ -29,8 +28,11 @@ def extract_git_data(repo_path):
         print("[ERROR] No branches found in this repo!")
         return []
 
-    total_commits = sum(repo.git.rev_list('--count', branch) for branch in branches)
-    total_commits = int(total_commits) if total_commits else 1
+    total_commits = 0
+    for branch in branches:
+        count = int(repo.git.rev_list('--count', branch))
+        total_commits += count
+    total_commits = min(total_commits, max_commits)
 
     seen_commits = set()
     data = []
@@ -38,6 +40,9 @@ def extract_git_data(repo_path):
     for branch in branches:
         print(f"[EXTRACT] Analyse de la branche '{branch}'")
         for commit in repo.iter_commits(branch):
+            if len(data) >= max_commits:
+                print(f"\n[INFO] Limite de {max_commits} commits atteinte, on arrête l'extraction.")
+                return data
             if commit.hexsha in seen_commits:
                 continue
             seen_commits.add(commit.hexsha)
