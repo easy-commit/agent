@@ -27,6 +27,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "0"
 device = torch.device("cpu")
 
+MAX_COMMITS_PER_REPO = 10000  # Limite ici
 
 def load_done_urls():
     if os.path.isfile(URLS_FILE):
@@ -34,11 +35,9 @@ def load_done_urls():
             return set(json.load(f))
     return set()
 
-
 def save_done_urls(done_urls):
     with open(URLS_FILE, "w") as f:
         json.dump(list(done_urls), f, indent=2)
-
 
 def train_model_on_dataset(model, dataset):
     ram_gb = psutil.virtual_memory().total / (1024**3)
@@ -75,7 +74,6 @@ def train_model_on_dataset(model, dataset):
     print(f"[INFO] Batch size used: {batch_size}")
     trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
 
-
 if __name__ == "__main__":
     if os.path.isdir(MODEL_OUTPUT_DIR):
         print("[INFO] Loading existing trained model.")
@@ -110,7 +108,7 @@ if __name__ == "__main__":
             temp_repo_path = None
             try:
                 temp_repo_path = clone_repo_temp(repo_url)
-                data = extract_git_data(temp_repo_path)
+                data = extract_git_data(temp_repo_path, max_commits=MAX_COMMITS_PER_REPO)
                 if not data or len(data) == 0:
                     print(f"[SKIP] No usable commits in {repo_url}")
                 else:
