@@ -17,8 +17,8 @@ def clone_repo_temp(repo_url):
 
 
 def extract_git_data(repo_path):
+    print(f"[EXTRACT] Analyzing repository '{repo_path}'")
     from git import Repo
-
     repo = Repo(repo_path)
     branches = [
         head.name
@@ -29,14 +29,21 @@ def extract_git_data(repo_path):
         print("[ERROR] No branches found in this repo!")
         return []
 
+    total_commits = sum(repo.git.rev_list('--count', branch) for branch in branches)
+    total_commits = int(total_commits) if total_commits else 1
+
     seen_commits = set()
     data = []
+    processed = 0
     for branch in branches:
         print(f"[EXTRACT] Analyse de la branche '{branch}'")
         for commit in repo.iter_commits(branch):
             if commit.hexsha in seen_commits:
                 continue
             seen_commits.add(commit.hexsha)
+            processed += 1
+            percent = (processed / total_commits) * 100
+            print(f"[EXTRACT] Progress: {percent:.1f}% ({processed}/{total_commits})", end="\r")
             msg = commit.message.strip()
             if (
                 msg.startswith("Merge pull request")
@@ -59,6 +66,7 @@ def extract_git_data(repo_path):
                     "diff": diff_text,
                 }
             )
+    print()
     return data
 
 
