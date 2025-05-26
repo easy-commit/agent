@@ -11,8 +11,8 @@ load_dotenv()
 
 API_LINK = os.getenv("API_LINK")
 if not API_LINK:
-    print("❌ La variable d'environnement API_LINK n'est pas définie.")
-    print("Exemple : export API_LINK=192.168.x.x (IP de ton serveur)")
+    print("The environment variable API_LINK is not set.")
+    print("Example: export API_LINK=192.168.x.x (your server's IP)")
     sys.exit(1)
 
 SERVER_URL = f"http://{API_LINK}:5000/suggest"
@@ -23,18 +23,18 @@ def main():
         "Chemin du dépôt Git pour générer un message de commit : "
     ).strip()
     if not repo_path:
-        print("❌ Chemin non renseigné.")
+        print("❌ Path not provided.")
         return
 
     try:
         repo = Repo(repo_path)
     except Exception as e:
-        print(f"❌ Impossible d'ouvrir le dépôt : {e}")
+        print(f"❌ Unable to open the repository: {e}")
         return
 
     diff = repo.git.diff("--cached", "--no-color")
     if not diff.strip():
-        print("🔹 Aucun fichier n'est indexé (staged).")
+        print("🔹 No files are staged (indexed).")
         return
 
     diff_clean = "\n".join(
@@ -47,27 +47,27 @@ def main():
         response = requests.post(SERVER_URL, json={"diff": diff_clean})
         response.raise_for_status()
     except Exception as e:
-        print(f"❌ Impossible de joindre le serveur API : {e}")
+        print(f"❌ Unable to reach the API server: {e}")
         return
 
     suggestions = response.json().get("suggestions", [])
     if not suggestions:
-        print("❌ Pas de suggestions reçues du serveur.")
+        print("❌ No suggestions received from the server.")
         return
 
     selected = inquirer.select(
-        message="💬 Sélectionne le message de commit à utiliser :",
+        message="Select the commit message to use:",
         choices=suggestions,
         pointer="👉",
     ).execute()
 
-    print(f"\n✅ Message sélectionné :\n{selected}\n")
+    print(f"\n✅ Selected message:\n{selected}\n")
 
     try:
         subprocess.run(["git", "-C", repo_path, "commit", "-m", selected], check=True)
-        print("🚀 Commit effectué avec succès.")
+        print("🚀 Commit completed successfully.")
     except subprocess.CalledProcessError as e:
-        print(f"❌ Erreur lors du commit : {e}")
+        print(f"❌ Error during commit: {e}")
 
 
 if __name__ == "__main__":
