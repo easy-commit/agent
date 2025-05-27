@@ -1,5 +1,7 @@
 import os
 from flask import Flask, jsonify, request
+from git import Repo
+
 from generate_commit import generate_commit_messages
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
