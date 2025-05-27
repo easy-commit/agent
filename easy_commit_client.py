@@ -1,7 +1,6 @@
 import os
 import subprocess
 import sys
-
 import requests
 from dotenv import load_dotenv
 from git import Repo
@@ -17,11 +16,8 @@ if not API_LINK:
 
 SERVER_URL = f"http://{API_LINK}:5000/suggest"
 
-
 def main():
-    repo_path = input(
-        "Chemin du dépôt Git pour générer un message de commit : "
-    ).strip()
+    repo_path = input("Chemin du dépôt Git pour générer un message de commit : ").strip()
     if not repo_path:
         print("❌ Path not provided.")
         return
@@ -68,7 +64,6 @@ def main():
         print("🚀 Commit completed successfully.")
     except subprocess.CalledProcessError as e:
         print(f"❌ Error during commit: {e}")
-
 
 if __name__ == "__main__":
     main()
