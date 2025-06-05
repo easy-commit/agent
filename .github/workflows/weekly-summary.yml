@@ -1,57 +1,64 @@
-name: Weekly Recap to Discord
+name: Weekly GitHub Digest
 
 on:
   schedule:
-    - cron: '0 18 * * 0' # Every Sunday at 18:00 UTC
+    - cron: '0 8 * * 0'
+  workflow_dispatch:
 
 jobs:
-  weekly-recap:
+  weekly-digest:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Generate weekly summary and post to Discord
+      - name: Generate weekly summary
         env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          START_DATE=$(date -u -d "7 days ago" +"%Y-%m-%dT00:00:00Z")
-          END_DATE=$(date -u +"%Y-%m-%dT23:59:59Z")
           REPO="${{ github.repository }}"
+          SINCE=$(date -d '7 days ago' --iso-8601=seconds)
+          NOW=$(date --iso-8601=seconds)
 
-          commits=$(gh api repos/$REPO/commits \
-            --paginate -q "[.[] | select(.commit.author.date >= \"$START_DATE\")] | length")
+          echo "Fetching commits and PRs from $SINCE to $NOW..."
 
-          prs_open=$(gh api repos/$REPO/pulls \
-            --paginate -q "[.[] | select(.created_at >= \"$START_DATE\")] | length")
+          COMMITS=$(gh api repos/$REPO/commits --paginate -q '[.[] | select(.commit.author.date >= "'"$SINCE"'")] | .[:5]' | jq -r '.[] | "- [`\(.sha[0:7])`](\(.html_url)) \(.commit.message | split("\n")[0]) by **\(.commit.author.name)**"')
+          PRS=$(gh api repos/$REPO/pulls --state=closed --sort=updated --direction=desc --paginate \
+            | jq -r '[.[] | select(.merged_at != null and .merged_at >= "'"$SINCE"'")] | .[:5] | .[] | "- [#\(.number) \(.title)](\(.html_url)) merged by **\(.user.login)**"')
 
-          prs_merged=$(gh api repos/$REPO/pulls \
-            --state=closed --paginate -q "[.[] | select(.merged_at != null and .merged_at >= \"$START_DATE\")] | length")
+          echo "Building JSON payload..."
+          SUMMARY=$(cat <<EOF
+{
+  "username": "EasyCommit Weekly",
+  "avatar_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+  "embeds": [{
+    "title": "🗓️ Weekly Digest for $REPO",
+    "description": "From **$SINCE** to **$NOW**",
+    "color": 3447003,
+    "fields": [
+      {
+        "name": "📦 Commits",
+        "value": "${COMMITS:-No commits this week.}"
+      },
+      {
+        "name": "🔀 Pull Requests",
+        "value": "${PRS:-No pull requests merged this week.}"
+      }
+    ],
+    "footer": {
+      "text": "GitHub • Weekly Summary"
+    },
+    "timestamp": "$NOW"
+  }]
+}
+EOF
+)
 
-          contributors=$(gh api repos/$REPO/commits \
-            --paginate -q "[.[] | select(.commit.author.date >= \"$START_DATE\")] | .[].author.login" | sort -u | wc -l)
+          echo "$SUMMARY" > weekly_payload.json
 
-          message="<@&123456789012345678> 📊 Here's the weekly recap for \`$REPO\`:"
-
-          jq -n --arg message "$message" \
-                --argjson commits "$commits" \
-                --argjson prs_open "$prs_open" \
-                --argjson prs_merged "$prs_merged" \
-                --argjson contributors "$contributors" \
-                --arg date "$(date -u +"%B %d, %Y")" \
-                '
-                {
-                  username: "EasyCommit Bot",
-                  content: $message,
-                  embeds: [{
-                    title: "🗓️ Weekly Summary (" + $date + ")",
-                    description: "**📦 Commits:** \($commits)\n**🔀 Pull Requests:** \($prs_open) opened, \($prs_merged) merged\n**👥 Active Contributors:** \($contributors)",
-                    color: 5814783,
-                    footer: { text: "GitHub Stats for the Week" },
-                    timestamp: now
-                  }]
-                }' > summary.json
-
+      - name: Send to Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEEKLY_WEBHOOK_URL }}
+        run: |
           curl -X POST -H "Content-Type: application/json" \
-               -d @summary.json "$DISCORD_WEBHOOK"
+               -d @weekly_payload.json "$DISCORD_WEBHOOK"

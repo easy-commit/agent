@@ -5,6 +5,7 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:  # 👈 autorise l'exécution manuelle du workflow
 
 permissions:
   contents: read
@@ -53,9 +54,8 @@ jobs:
           curl --fail http://localhost:5000/dashboard
 
   deploy:
-    needs: build-and-test
     runs-on: ubuntu-latest
-    if: ${{ needs.build-and-test.result == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -75,7 +75,7 @@ jobs:
             --auth-user-pass <(echo -e "${VPN_USERNAME}\n${VPN_PASSWORD}")
           sleep 20
 
-      - name: Deploy via SSH
+      - name: Deploy and run EasyCommit on remote server
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
