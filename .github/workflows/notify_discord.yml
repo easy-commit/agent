@@ -1,0 +1,115 @@
+name: Notify Discord
+
+on:
+  push:
+    branches: [main, dev, staging]
+  pull_request:
+    types: [opened, closed, reopened]
+  workflow_run:
+    workflows: ["EasyCommit guard CI"]
+    types: [completed]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Notify Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          EVENT_NAME="${{ github.event_name }}"
+
+          generate_push_payload() {
+            echo '${{ toJSON(github.event.commits) }}' > commits.json
+
+            jq -n \
+              --arg actor "${{ github.actor }}" \
+              --arg repo "${{ github.repository }}" \
+              --arg branch "${{ github.ref_name }}" \
+              --arg url "${{ github.event.compare }}" \
+              --slurpfile commits commits.json \
+              '
+              {
+                username: "EasyCommit guard",
+                avatar_url: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                embeds: [{
+                  title: "📦 New push to \($branch)",
+                  description: "**\($actor)** pushed to **\($repo)**",
+                  color: 3447003,
+                  fields: ($commits[0] | map({
+                    name: (.id[0:7] + " - " + .author.name),
+                    value: .message,
+                    inline: false
+                  })),
+                  footer: {
+                    text: "GitHub Actions • EasyCommit guard"
+                  },
+                  url: $url,
+                  timestamp: (now | todate)
+                }]
+              }
+              '
+          }
+
+          generate_pr_payload() {
+            jq -n \
+              --arg action "${{ github.event.action }}" \
+              --arg user "${{ github.actor }}" \
+              --arg title "${{ github.event.pull_request.title }}" \
+              --arg url "${{ github.event.pull_request.html_url }}" \
+              '
+              {
+                username: "EasyCommit guard",
+                avatar_url: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                embeds: [{
+                  title: "🔀 Pull Request \($action | ascii_upcase)",
+                  description: "**\($user)** \($action) a PR: [\($title)](\($url))",
+                  color: 15105570,
+                  footer: { text: "GitHub PR Event" },
+                  timestamp: (now | todate)
+                }]
+              }
+              '
+          }
+
+          generate_workflow_payload() {
+            jq -n \
+              --arg user "${{ github.actor }}" \
+              --arg name "${{ github.workflow }}" \
+              --arg status "${{ github.event.workflow_run.conclusion }}" \
+              --arg url "${{ github.event.workflow_run.html_url }}" \
+              '
+              {
+                username: "EasyCommit guard",
+                avatar_url: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                embeds: [{
+                  title: "⚙️ Workflow Run: \($name)",
+                  description: "**\($user)** triggered workflow with status: **\($status | ascii_upcase)**",
+                  color: (if $status == "success" then 3066993 else 15158332 end),
+                  footer: { text: "GitHub Workflow" },
+                  url: $url,
+                  timestamp: (now | todate)
+                }]
+              }
+              '
+          }
+
+          case "$EVENT_NAME" in
+            push)
+              generate_push_payload > payload.json
+              ;;
+            pull_request)
+              generate_pr_payload > payload.json
+              ;;
+            workflow_run)
+              generate_workflow_payload > payload.json
+              ;;
+            *)
+              echo "Unsupported event: $EVENT_NAME" >&2
+              exit 0
+              ;;
+          esac
+
+          curl -X POST -H "Content-Type: application/json" \
+               -d @payload.json "$DISCORD_WEBHOOK"
