@@ -1,9 +1,10 @@
+import os
 import re
 
 import torch
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 
-MODEL_OUTPUT_DIR = "output/easycommit_model"
+MODEL_OUTPUT_DIR = os.getenv("MODEL_PATH", "output/easycommit_model")
 device = torch.device("cpu")
 
 tokenizer = T5Tokenizer.from_pretrained(MODEL_OUTPUT_DIR, legacy=True)

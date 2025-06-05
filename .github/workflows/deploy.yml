@@ -47,6 +47,13 @@ jobs:
           pip install pytest
           pytest tests || echo "✅ No tests defined yet."
 
+      - name: Patch model path for CI
+        run: |
+          rm -rf output/easycommit_model
+          mkdir -p output
+          ln -s ~/.cache/huggingface/hub/models--t5-small output/easycommit_model || echo "Fallback to install"
+          python -c "from transformers import T5Tokenizer, T5ForConditionalGeneration; T5ForConditionalGeneration.from_pretrained('t5-small').save_pretrained('output/easycommit_model'); T5Tokenizer.from_pretrained('t5-small').save_pretrained('output/easycommit_model')"
+
       - name: Check server response (API health)
         run: |
           python server.py &
