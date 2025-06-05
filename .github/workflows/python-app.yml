@@ -34,7 +34,7 @@ jobs:
 
       - name: Type checking with mypy
         run: |
-          pip install mypy
+          pip install mypy types-requests types-psutil pandas-stubs
           mypy .
 
       - name: Test with pytest
