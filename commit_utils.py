@@ -30,7 +30,7 @@ def extract_git_data(repo_path, max_commits=10000):
 
     total_commits = 0
     for branch in branches:
-        count = int(repo.git.rev_list('--count', branch))
+        count = int(repo.git.rev_list("--count", branch))
         total_commits += count
     total_commits = min(total_commits, max_commits)
 
@@ -41,14 +41,19 @@ def extract_git_data(repo_path, max_commits=10000):
         print(f"[EXTRACT] Analyse de la branche '{branch}'")
         for commit in repo.iter_commits(branch):
             if len(data) >= max_commits:
-                print(f"\n[INFO] Limite de {max_commits} commits atteinte, on arrête l'extraction.")
+                print(
+                    f"\n[INFO] Limite de {max_commits} commits atteinte, on arrête l'extraction."
+                )
                 return data
             if commit.hexsha in seen_commits:
                 continue
             seen_commits.add(commit.hexsha)
             processed += 1
             percent = (processed / total_commits) * 100
-            print(f"[EXTRACT] Progress: {percent:.1f}% ({processed}/{total_commits})", end="\r")
+            print(
+                f"[EXTRACT] Progress: {percent:.1f}% ({processed}/{total_commits})",
+                end="\r",
+            )
             msg = commit.message.strip()
             if (
                 msg.startswith("Merge pull request")

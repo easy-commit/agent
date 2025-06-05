@@ -1,14 +1,11 @@
-<img src="white-mini-logo-with-text.svg" alt="logo" width="360"/>
-
----
-
-### **easy-commit** is an open-source AI agent that automatically generates smart commit messages by learning from real commits found on GitHub. The goal: simplify your commit process and make your project history clear, consistent, and professional.
+# EASY-COMMIT
 
 ---
 
 ## Why easy-commit?
 
 Writing good commit messages is often overlooked, but it’s crucial for understanding a project’s evolution. With easy-commit, you no longer have to worry about crafting the perfect message—let AI do it for you, inspired by the best practices from thousands of real projects.
+**easy-commit** is an open-source AI agent that automatically generates smart commit messages by learning from real commits found on GitHub. The goal: simplify your commit process and make your project history clear, consistent, and professional.
 
 ---
 

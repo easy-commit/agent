@@ -2,7 +2,6 @@
 
 set -e
 
-# Remove old venv folders
 if [ -d "venv" ]; then
     echo "Removing existing venv..."
     rm -rf venv
@@ -13,7 +12,6 @@ if [ -d ".venv" ]; then
     rm -rf .venv
 fi
 
-# Ensure system dependencies for pyenv & python build (Debian/Ubuntu)
 echo "Installing system build dependencies (Debian/Ubuntu)..."
 sudo apt-get update
 sudo apt-get install -y \
@@ -29,7 +27,6 @@ if ! command -v pyenv >/dev/null 2>&1; then
     export PATH="$HOME/.pyenv/bin:$PATH"
     eval "$(pyenv init --path)"
     eval "$(pyenv init -)"
-    # Add pyenv init lines to shell profile if not already there
     if ! grep -q 'pyenv init' ~/.bashrc; then
         echo -e '\n# pyenv config\nexport PATH="$HOME/.pyenv/bin:$PATH"\neval "$(pyenv init --path)"\neval "$(pyenv init -)"' >> ~/.bashrc
     fi
@@ -40,26 +37,21 @@ else
     eval "$(pyenv init -)"
 fi
 
-# Install Python with pyenv and set as local
 PYTHON_VERSION="3.10.14"
 pyenv install --skip-existing $PYTHON_VERSION
 pyenv local $PYTHON_VERSION
 
-# Ensure the correct Python is used
 PYTHON_BIN="$(pyenv which python)"
 echo "Using Python binary: $PYTHON_BIN"
 "$PYTHON_BIN" --version
 
-# Create and activate venv using the forced Python version
 echo "Creating new venv using Python $PYTHON_VERSION..."
 "$PYTHON_BIN" -m venv venv
 source venv/bin/activate
 
-# Upgrade pip and setuptools
 echo "Upgrading pip, setuptools, wheel..."
 pip install --upgrade pip setuptools wheel
 
-# Install requirements.txt if present
 if [ -f "requirements.txt" ]; then
     echo "Installing requirements from requirements.txt..."
     pip install -r requirements.txt
@@ -73,7 +65,6 @@ echo "To activate your virtual environment in the future, run:"
 echo "  source venv/bin/activate"
 echo
 
-# Check for .venv directory and activate if present
 if [ -f "train_model.py" ]; then
     echo "Running train_model.py..."
     python train_model.py
