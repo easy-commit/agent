@@ -2,15 +2,22 @@ name: Weekly GitHub Digest
 
 on:
   schedule:
-    - cron: '0 8 * * 0'
+    - cron: '0 8 * * 0'  # Every Sunday at 8am UTC
   workflow_dispatch:
 
 jobs:
   weekly-digest:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+
+      - name: Install GitHub CLI + jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          curl -sSL https://cli.github.com/install.sh | sh
 
       - name: Generate weekly summary
         env:
@@ -20,14 +27,17 @@ jobs:
           SINCE=$(date -d '7 days ago' --iso-8601=seconds)
           NOW=$(date --iso-8601=seconds)
 
-          echo "Fetching commits and PRs from $SINCE to $NOW..."
+          echo "🔍 Fetching commits and PRs from $SINCE to $NOW..."
 
-          COMMITS=$(gh api repos/$REPO/commits --paginate -q '[.[] | select(.commit.author.date >= "'"$SINCE"'")] | .[:5]' | jq -r '.[] | "- [`\(.sha[0:7])`](\(.html_url)) \(.commit.message | split("\n")[0]) by **\(.commit.author.name)**"')
-          PRS=$(gh api repos/$REPO/pulls --state=closed --sort=updated --direction=desc --paginate \
-            | jq -r '[.[] | select(.merged_at != null and .merged_at >= "'"$SINCE"'")] | .[:5] | .[] | "- [#\(.number) \(.title)](\(.html_url)) merged by **\(.user.login)**"')
+          COMMITS=$(gh api repos/$REPO/commits --paginate -q '[.[] | select(.commit.author.date >= "'"$SINCE"'")] | .[:5]' | \
+            jq -r '.[] | "- [`\(.sha[0:7])`](\(.html_url)) \(.commit.message | split("\n")[0]) by **\(.commit.author.name)**"' | jq -Rs .)
 
-          echo "Building JSON payload..."
-          SUMMARY=$(cat <<EOF
+          PRS=$(gh api repos/$REPO/pulls --state=closed --sort=updated --direction=desc --paginate | \
+            jq -r '[.[] | select(.merged_at != null and .merged_at >= "'"$SINCE"'")] | .[:5] | .[] | "- [#\(.number) \(.title)](\(.html_url)) merged by **\(.user.login)**"' | jq -Rs .)
+
+          NOW_ESC=$(echo "$NOW" | jq -R .)
+
+          cat > weekly_payload.json <<EOF
 {
   "username": "EasyCommit Weekly",
   "avatar_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
@@ -38,23 +48,20 @@ jobs:
     "fields": [
       {
         "name": "📦 Commits",
-        "value": "${COMMITS:-No commits this week.}"
+        "value": ${COMMITS:-"\"No commits this week.\""}
       },
       {
         "name": "🔀 Pull Requests",
-        "value": "${PRS:-No pull requests merged this week.}"
+        "value": ${PRS:-"\"No pull requests merged this week.\""}
       }
     ],
     "footer": {
       "text": "GitHub • Weekly Summary"
     },
-    "timestamp": "$NOW"
+    "timestamp": $NOW_ESC
   }]
 }
 EOF
-)
-
-          echo "$SUMMARY" > weekly_payload.json
 
       - name: Send to Discord
         env:
