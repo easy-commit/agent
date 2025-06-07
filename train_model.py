@@ -57,15 +57,11 @@ def limit_cpu_usage():
 def score_commit_message(msg: str) -> float:
     """
     Heuristic score to evaluate commit message quality.
-    Penalizes long messages, missing conventional prefixes, etc.
     """
     score = 1.0
     if len(msg) > 100:
         score -= 0.5
-    if not any(
-        msg.startswith(prefix)
-        for prefix in ["feat", "fix", "chore", "docs", "refactor", "style", "deps"]
-    ):
+    if not any(msg.startswith(prefix) for prefix in ["feat", "fix", "chore", "docs", "refactor", "style", "deps"]):
         score -= 0.3
     if ":" not in msg:
         score -= 0.2
@@ -129,13 +125,36 @@ def log_monitor(repo_url, dataset_size, valid_count):
         f.write(f"{now},{repo_url},{dataset_size},{valid_count}\n")
 
 
+def load_latest_model_or_base():
+    latest_checkpoints = sorted(
+        [os.path.join(CHECKPOINT_DIR, d) for d in os.listdir(CHECKPOINT_DIR)
+         if os.path.isdir(os.path.join(CHECKPOINT_DIR, d))],
+        reverse=True
+    )
+
+    if latest_checkpoints:
+        last_checkpoint = latest_checkpoints[0]
+        print(f"[INFO] Resuming model from last checkpoint: {last_checkpoint}")
+        tokenizer = T5Tokenizer.from_pretrained(last_checkpoint, legacy=True)
+        model = T5ForConditionalGeneration.from_pretrained(last_checkpoint).to(device)
+    else:
+        print(f"[INFO] No checkpoint found. Initializing model from base: {MODEL_NAME}")
+        tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME, legacy=True)
+        model = T5ForConditionalGeneration.from_pretrained(MODEL_NAME).to(device)
+    return tokenizer, model
+
+
+if not os.path.exists(MONITOR_FILE):
+    os.makedirs(os.path.dirname(MONITOR_FILE), exist_ok=True)
+    with open(MONITOR_FILE, "w") as f:
+        f.write("timestamp,repo_url,total_samples,valid_samples\n")
+
 if __name__ == "__main__":
-    if not os.path.exists(MONITOR_FILE):
-        with open(MONITOR_FILE, "w") as f:
-            f.write("timestamp,repo_url,total_samples,valid_samples\n")
 
     done_urls = load_done_urls()
     print(f"[INFO] {len(done_urls)} repositories already processed.")
+
+    tokenizer, model = load_latest_model_or_base()
 
     while True:
         urls = fetch_public_github_repos(per_page=100, pages=1)
@@ -157,19 +176,6 @@ if __name__ == "__main__":
             temp_repo_path = None
 
             try:
-                if os.path.isdir(MODEL_OUTPUT_DIR):
-                    tokenizer = T5Tokenizer.from_pretrained(
-                        MODEL_OUTPUT_DIR, legacy=True
-                    )
-                    model = T5ForConditionalGeneration.from_pretrained(
-                        MODEL_OUTPUT_DIR
-                    ).to(device)
-                else:
-                    tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME, legacy=True)
-                    model = T5ForConditionalGeneration.from_pretrained(MODEL_NAME).to(
-                        device
-                    )
-
                 temp_repo_path = clone_repo_temp(repo_url)
                 data = extract_git_data(temp_repo_path, max_commits=DEFAULT_MAX_COMMITS)
 
@@ -213,7 +219,6 @@ if __name__ == "__main__":
                     del dataset, tokenized
                 except:
                     pass
-                del model, tokenizer
                 gc.collect()
                 try:
                     torch.cuda.empty_cache()
