@@ -7,11 +7,9 @@ from datetime import datetime
 
 import psutil
 import torch
-from transformers import (T5ForConditionalGeneration, T5Tokenizer, Trainer,
-                          TrainingArguments)
+from transformers import T5ForConditionalGeneration, T5Tokenizer, Trainer, TrainingArguments
 
-from commit_utils import (clone_repo_temp, extract_git_data, prepare_dataset,
-                          preprocess_dataset)
+from commit_utils import clone_repo_temp, extract_git_data, prepare_dataset, preprocess_dataset
 from fetch_github import fetch_public_github_repos
 
 os.environ["OMP_NUM_THREADS"] = "6"
@@ -157,6 +155,12 @@ if __name__ == "__main__":
     tokenizer, model = load_latest_model_or_base()
 
     while True:
+        current_hour = datetime.now().hour
+        if current_hour >= 23 or current_hour < 7:
+            print("[PAUSE] Outside of allowed hours (7am-11pm). Waiting 30 min...")
+            time.sleep(1800)
+            continue
+
         urls = fetch_public_github_repos(per_page=100, pages=1)
         print(f"[INFO] {len(urls)} new repositories fetched.")
 
