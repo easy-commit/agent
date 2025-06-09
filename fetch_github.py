@@ -6,8 +6,8 @@ def fetch_public_github_repos(per_page=20, pages=2):
     all_repos = []
     for page in range(1, pages + 1):
         params = {
-            "q": "stars:>100",
-            "sort": "stars",
+            "q": "stars:>10 pushed:>2024-01-01",
+            "sort": "updated",
             "order": "desc",
             "per_page": per_page,
             "page": page,

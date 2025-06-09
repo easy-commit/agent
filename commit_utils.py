@@ -38,11 +38,11 @@ def extract_git_data(repo_path, max_commits=10000):
     data = []
     processed = 0
     for branch in branches:
-        print(f"[EXTRACT] Analyse de la branche '{branch}'")
+        print(f"[EXTRACT] Analyzing branch '{branch}'")
         for commit in repo.iter_commits(branch):
             if len(data) >= max_commits:
                 print(
-                    f"\n[INFO] Limite de {max_commits} commits atteinte, on arrête l'extraction."
+                    f"\n[INFO] Limit of {max_commits} commits reached, stopping extraction."
                 )
                 return data
             if commit.hexsha in seen_commits:
