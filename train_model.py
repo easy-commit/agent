@@ -27,7 +27,7 @@ CHECKPOINT_DIR = os.path.join(MODEL_OUTPUT_DIR, "checkpoints")
 URLS_FILE = "urls-github.json"
 DEFAULT_MAX_COMMITS = 10000
 DIFF_CHAR_LIMIT = 2000
-CPU_USAGE_LIMIT = 80  # percent
+CPU_USAGE_LIMIT = 80
 MONITOR_FILE = "./training_log.csv"
 
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
@@ -148,11 +148,13 @@ if not os.path.exists(MONITOR_FILE):
         f.write("timestamp,repo_url,total_samples,valid_samples\n")
 
 if __name__ == "__main__":
+    if not os.path.exists(MONITOR_FILE):
+        os.makedirs(os.path.dirname(MONITOR_FILE), exist_ok=True)
+        with open(MONITOR_FILE, "w") as f:
+            f.write("timestamp,repo_url,total_samples,valid_samples\n")
 
     done_urls = load_done_urls()
     print(f"[INFO] {len(done_urls)} repositories already processed.")
-
-    tokenizer, model = load_latest_model_or_base()
 
     while True:
         current_hour = datetime.now().hour
@@ -180,6 +182,8 @@ if __name__ == "__main__":
             temp_repo_path = None
 
             try:
+                tokenizer, model = load_latest_model_or_base()
+
                 temp_repo_path = clone_repo_temp(repo_url)
                 data = extract_git_data(temp_repo_path, max_commits=DEFAULT_MAX_COMMITS)
 
@@ -219,10 +223,10 @@ if __name__ == "__main__":
                     shutil.rmtree(temp_repo_path, ignore_errors=True)
                 done_urls.add(repo_url)
                 save_done_urls(done_urls)
-                try:
-                    del dataset, tokenized
-                except:
-                    pass
+
+                for var in ['dataset', 'tokenized', 'data']:
+                    if var in locals():
+                        del locals()[var]
                 gc.collect()
                 try:
                     torch.cuda.empty_cache()
